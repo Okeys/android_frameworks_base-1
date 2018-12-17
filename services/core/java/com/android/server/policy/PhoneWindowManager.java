@@ -4484,6 +4484,9 @@ public class PhoneWindowManager implements WindowManagerPolicy {
         if (statusbar != null) {
             statusbar.preloadRecentApps();
         }
+        if (keyguardOn()) {
+            return;
+        }
     }
 
     protected void cancelPreloadRecentApps() {
@@ -4493,6 +4496,9 @@ public class PhoneWindowManager implements WindowManagerPolicy {
             if (statusbar != null) {
                 statusbar.cancelPreloadRecentApps();
             }
+            if (keyguardOn()) {
+                return;
+            }
         }
     }
 
@@ -4501,6 +4507,9 @@ public class PhoneWindowManager implements WindowManagerPolicy {
         StatusBarManagerInternal statusbar = getStatusBarManagerInternal();
         if (statusbar != null) {
             statusbar.toggleRecentApps();
+        }
+        if (keyguardOn()) {
+            return;
         }
     }
 
@@ -6306,7 +6315,7 @@ public class PhoneWindowManager implements WindowManagerPolicy {
 
         // Handle special keys.
         switch (keyCode) {
-            case KeyEvent.KEYCODE_BACK: {
+            /*case KeyEvent.KEYCODE_BACK: {
                 if (down) {
                     interceptBackKeyDown();
                 } else {
@@ -6318,7 +6327,7 @@ public class PhoneWindowManager implements WindowManagerPolicy {
                     }
                 }
                 break;
-            }
+            }*/
 
             case KeyEvent.KEYCODE_VOLUME_DOWN:
             case KeyEvent.KEYCODE_VOLUME_UP:
@@ -9290,5 +9299,106 @@ public class PhoneWindowManager implements WindowManagerPolicy {
                 break;
             }
         }
+
+    private void doDownKeyAction(int keyAction) {
+        if (keyAction == KEY_ACTION_APP_SWITCH) {
+            preloadRecentApps();
+            doStartLongPressKeyAction(keyAction);
+        }
+        if (keyAction == KEY_ACTION_BACK) {
+            doStartLongPressKeyAction(keyAction);
+        }
+    }
+     private void doStartLongPressKeyAction(int keyAction) {
+        if (keyAction == KEY_ACTION_APP_SWITCH) {
+            mAppSwitchConsumed = false;
+            Message msg = mHandler.obtainMessage(MSG_APP_SWITCH_LONG_PRESS);
+            triggerLongPressTimeoutMessage(msg);
+        }
+        if (keyAction == KEY_ACTION_BACK) {
+            mBackKeyHandled = false;
+            Message msg = mHandler.obtainMessage(MSG_BACK_LONG_PRESS);
+            triggerLongPressTimeoutMessage(msg);
+        }
+    }
+     private void triggerLongPressTimeoutMessage(Message msg) {
+        msg.setAsynchronous(true);
+        mHandler.sendMessageDelayed(msg,
+                ViewConfiguration.get(mContext).getLongPressTimeout());
+    }
+     private boolean doLongPressKeyAction(int keyAction) {
+        if (keyAction == KEY_ACTION_APP_SWITCH) {
+            cancelPendingAppSwitchAction();
+            if (mAppSwitchConsumed) {
+                mAppSwitchConsumed = false;
+                return true;
+            }
+            cancelPreloadRecentApps();
+        }
+        if (keyAction == KEY_ACTION_BACK) {
+            cancelPendingBackKeyAction();
+            if (mBackKeyHandled) {
+                mBackKeyHandled = false;
+                return true;
+            }
+            if (mLongPressBackConsumed) {
+                mLongPressBackConsumed = false;
+                return true;
+            }
+        }
+        return false;
+    }
+     private int doUpKeyAction(int keyCode, boolean canceled) {
+        if (keyCode == KeyEvent.KEYCODE_BACK) {
+            if (mDoCustomAction) {
+                mDoCustomAction = false;
+                if (doLongPressKeyAction(mPressOnBackBehavior)) {
+                    return -1;
+                }
+                if (!canceled) {
+                    performKeyAction(mPressOnBackBehavior);
+                }
+                return -1;
+            }
+            if (doLongPressKeyAction(KEY_ACTION_BACK)) {
+                return -1;
+            }
+            // normal back handling is just to pass down
+        }
+        if (keyCode == KeyEvent.KEYCODE_APP_SWITCH) {
+            if (mDoCustomAction) {
+                mDoCustomAction = false;
+                if (doLongPressKeyAction(mPressOnAppSwitchBehavior)) {
+                    return -1;
+                }
+                if (!canceled) {
+                    performKeyAction(mPressOnAppSwitchBehavior);
+                }
+                return -1;
+            }
+            if (doLongPressKeyAction(KEY_ACTION_APP_SWITCH)) {
+                return -1;
+            }
+            performKeyAction(KEY_ACTION_APP_SWITCH);
+        }
+        return 0;
+    }
+     private boolean isCustomKeyAction(int keyCode) {
+        if (keyCode == KeyEvent.KEYCODE_BACK) {
+            return mPressOnBackBehavior != KEY_ACTION_BACK;
+        }
+        if (keyCode == KeyEvent.KEYCODE_APP_SWITCH) {
+            return mPressOnAppSwitchBehavior != KEY_ACTION_APP_SWITCH;
+        }
+        return false;
+    }
+     private int getCustomKeyAction(int keyCode) {
+        if (keyCode == KeyEvent.KEYCODE_BACK) {
+            return mPressOnBackBehavior;
+        }
+        if (keyCode == KeyEvent.KEYCODE_APP_SWITCH) {
+            return mPressOnAppSwitchBehavior;
+        }
+        return -1;
     }
 }

@@ -4161,6 +4161,11 @@ public final class Settings {
         private static final Validator OMNI_DEVICE_FEATURE_SETTINGS_VALIDATOR =
                 ANY_STRING_VALIDATOR;
 
+         /**
+         * @hide
+         */
+        public static final String BUTTON_SWAP_BACK_RECENTS = "button_swap_back_recents";
+
         /**
          * @hide
          */
